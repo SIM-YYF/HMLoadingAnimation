@@ -6,6 +6,10 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.view.animation.Animation;
+import android.view.animation.LinearInterpolator;
+import android.view.animation.RotateAnimation;
+import android.widget.ImageView;
 
 public class MainActivity extends Activity {
 	private static final int REFRESH_PROGRESS = 0x10;
@@ -43,6 +47,23 @@ public class MainActivity extends Activity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 		mLeafLoadingView = (LoadingView) findViewById(R.id.leaf_loading);
+		ImageView  iv_fengshan = (ImageView) this.findViewById(R.id.iv_fengshan);
+		RotateAnimation  ra = new RotateAnimation(
+				0, 
+				360, 
+				Animation.RELATIVE_TO_SELF,//相对于X轴的伸缩模式 
+				0.5f, //相对于X轴的坐标值    
+				Animation.RELATIVE_TO_SELF,  //相对于Y轴的伸缩模式
+				0.5f);//相对于Y轴的坐标值
+		
+		ra.setInterpolator(new LinearInterpolator());
+		ra.setFillAfter(false);
+		ra.setRepeatMode(Animation.RESTART);
+		ra.setRepeatCount(Animation.INFINITE);
+		ra.setDuration(1500);
+		ra.start();
+		iv_fengshan.setAnimation(ra);
+		
 		mHandler.sendEmptyMessageDelayed(REFRESH_PROGRESS, 3000);
 	}
 

@@ -1,24 +1,23 @@
 package com.hm;
 
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
+
 
 
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
-import android.util.Log;
 import android.view.Display;
 import android.view.View;
 import android.view.WindowManager;
@@ -79,22 +78,49 @@ public class LoadingView extends View{
 	 */
 	int leaf_out_height;
 	
-	private static final int PROGRESS_LEFT_TOP_BOTTOM_MARGIN = 10;
+	private static final int PROGRESS_LEFT_TOP_BOTTOM_MARGIN = 12;
 	private static final int PROGRESS_RIGHT_MARGIN = 25;
+    // 叶子飘动一个周期所花的时间
+    private static final long LEAF_FLOAT_TIME = 3000;
+    // 叶子旋转一周需要的时间
+    private static final long LEAF_ROTATE_TIME = 2000;
+    
 	 // 淡白色
     private static final int WHITE_COLOR = 0xfffde399;
     // 橙色
     private static final int ORANGE_COLOR = 0xffffa800;
+    
     // 进度条的总进度
     private static final int TOTAL_PROGRESS = 100;
+    // 中等振幅大小
+    private static final int MIDDLE_AMPLITUDE = 13;
+    // 不同类型之间的振幅差距
+    private static final int AMPLITUDE_DISPARITY = 5;
+    
+    
+    /**
+     * 叶子飘动一个周期所花的时间
+     */
+    private long mLeafFloatTime = LEAF_FLOAT_TIME;
+    /**
+     *  叶子旋转一周需要的时间
+      */
+    private long mLeafRotateTime = LEAF_ROTATE_TIME;
+    
+    // 中等振幅大小
+    private int mMiddleAmplitude = MIDDLE_AMPLITUDE;
+    // 振幅差
+    private int mAmplitudeDisparity = AMPLITUDE_DISPARITY;
+    
+    
 	/**
 	 * 控制绘制进度条left，top，bottom边距
 	 */
-	int progress_left_top_bottom_margin = 10;
+	int progress_left_top_bottom_margin = 0;
 	/**
 	 * 控制绘制进度条right边距
 	 */
-	int progress_right_margin = 25;
+	int progress_right_margin = 0;
 	/**
 	 * 当前所在的绘制的进度条的位置
 	 */
@@ -102,16 +128,14 @@ public class LoadingView extends View{
 	/**
 	 * 当前进度条的宽度
 	 */
-	int current_progress_width;
+	int progress_width;
 	/**
 	 * 当前进度条进度
 	 */
 	int mProgress = 0;
 	
-	/**
-	 * 弧度右上角坐标
-	 */
-	int radian_right_x_location = 0;
+	// arc的右上角的x坐标，也是矩形x坐标的起始点
+    private int mArcRightLocation;
 	
 	/**
 	 * 进度条边框
@@ -131,7 +155,10 @@ public class LoadingView extends View{
 	 * 叶子集合
 	 */
 	List<Leaf> leafs;
-	LeaFactory  factory;
+	LeafFactory  factory;
+	
+	 // 用于控制随机增加的时间不抱团
+    private int mAddTime;
 	
 	public LoadingView(Context context, AttributeSet attrs) {
 		super(context, attrs);
@@ -143,8 +170,8 @@ public class LoadingView extends View{
 		initBitmap();
 		
 		//产生叶子
-		factory = new LeaFactory();
-		leafs = factory.getLeafs(6);
+		factory = new LeafFactory();
+		leafs = factory.generateLeafs();
 		
 		
 	}
@@ -177,11 +204,11 @@ public class LoadingView extends View{
 		DisplayMetrics  metric = context.getResources().getDisplayMetrics();
 		WindowManager  wm = (WindowManager) context.getSystemService(context.WINDOW_SERVICE);
 		Display  display = wm.getDefaultDisplay();
-		density = metric.density;
 		display.getMetrics(metric);
+		density = metric.density;
 		
-		progress_left_top_bottom_margin = (int) (PROGRESS_LEFT_TOP_BOTTOM_MARGIN * metric.density);
-		progress_right_margin = (int)(PROGRESS_RIGHT_MARGIN * metric.density);
+		progress_left_top_bottom_margin = (int) (PROGRESS_LEFT_TOP_BOTTOM_MARGIN * density);
+		progress_right_margin = (int)(PROGRESS_RIGHT_MARGIN * density);
 	}
 	
 	/**
@@ -190,26 +217,26 @@ public class LoadingView extends View{
 	private void initBitmap(){
 		
 		//第一种方式
-		BitmapFactory.Options opts = new BitmapFactory.Options();
-		opts.inJustDecodeBounds = false;
-		opts.inScaled = false;
-		opts.inDither = true;
-		opts.inSampleSize = 1;
-		opts.inPreferredConfig = Config.ARGB_8888;
+//		BitmapFactory.Options opts = new BitmapFactory.Options();
+//		opts.inJustDecodeBounds = false;
+//		opts.inScaled = false;
+//		opts.inDither = false;
+//		opts.inSampleSize = 1;
+//		opts.inPreferredConfig = Config.ARGB_8888;
+//		
+//		progress_frame_bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.leaf_kuang, opts);
+//		progress_frame_out_width = progress_frame_bitmap.getWidth();
+//		progress_frame_out_height = progress_frame_bitmap.getHeight();
 		
-		progress_frame_bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.leaf_kuang, opts);
-		progress_frame_out_width = progress_frame_bitmap.getWidth();
-		progress_frame_out_height = progress_frame_bitmap.getHeight();
-		
-		leaf_bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.leaf, opts);
+		leaf_bitmap = ((BitmapDrawable)(getResources().getDrawable(R.drawable.leaf))).getBitmap();
 		leaf_out_width = leaf_bitmap.getWidth();
 		leaf_out_height = leaf_bitmap.getHeight();
 		
 		
 		//第二种方式
-//		progress_frame_bitmap= ((BitmapDrawable)getResources().getDrawable(R.drawable.leaf_kuang)).getBitmap();
-//		progress_frame_out_width = progress_frame_bitmap.getWidth();
-//		progress_frame_out_height = progress_frame_bitmap.getHeight();
+		progress_frame_bitmap= ((BitmapDrawable)getResources().getDrawable(R.drawable.leaf_kuang)).getBitmap();
+		progress_frame_out_width = progress_frame_bitmap.getWidth();
+		progress_frame_out_height = progress_frame_bitmap.getHeight();
 		
 		
 		
@@ -222,7 +249,7 @@ public class LoadingView extends View{
 	@Override
 	protected void onDraw(Canvas canvas) {
 		super.onDraw(canvas);
-		drawProgressAndLeafs(canvas, leafs);
+		drawProgressAndLeafs(canvas);
 		canvas.drawBitmap(progress_frame_bitmap, progress_frame_rect, view_rect, bitmapPaint);
 		postInvalidate();//注意：Invalidate  和  postInvalidate 的区别
 	}
@@ -240,9 +267,9 @@ public class LoadingView extends View{
 		total_height = h;
 		
 		//当前进度条的宽度
-		current_progress_width = progress_frame_out_width - progress_left_top_bottom_margin - progress_right_margin;
+		progress_width = total_width - progress_left_top_bottom_margin - progress_right_margin;
 		//计算弧度的半径
-		arc_radius =  (progress_frame_out_width -  2 *progress_left_top_bottom_margin) / 2;
+		arc_radius =  (total_height -  2 * progress_left_top_bottom_margin) / 2;
 				
 		//初始矩形view. 注意：这里不是RectF 
 		view_rect = new Rect(0, 0, total_width, total_height);
@@ -251,10 +278,10 @@ public class LoadingView extends View{
 		
 		//初始进度条白色区域矩形(包含弧度区域部分)
 		progress_white_rectf = new RectF(
-				progress_left_top_bottom_margin + arc_radius + current_progress_position, 
+				progress_left_top_bottom_margin + current_progress_position, 
 				progress_left_top_bottom_margin, 
-				progress_frame_out_width - progress_right_margin, //这里不一样
-				progress_frame_out_height - progress_left_top_bottom_margin //这里不一样
+				total_width - progress_right_margin, //这里不一样
+				total_height - progress_left_top_bottom_margin //这里不一样
 				);
 		
 		
@@ -265,7 +292,7 @@ public class LoadingView extends View{
 				progress_left_top_bottom_margin + arc_radius, 
 				progress_left_top_bottom_margin, 
 				current_progress_position,                                                                                                                                                                   
-				progress_frame_out_height - progress_left_top_bottom_margin //这里不一样
+				total_height - progress_left_top_bottom_margin //这里不一样
 				);
 		
 		
@@ -274,152 +301,158 @@ public class LoadingView extends View{
 				progress_left_top_bottom_margin, 
 				progress_left_top_bottom_margin, 
 				progress_left_top_bottom_margin + 2 * arc_radius, 
-				progress_frame_out_height - progress_left_top_bottom_margin
+				total_height - progress_left_top_bottom_margin
 				);
 		
+		//初始弧形的右上角的x坐标，也是矩形x坐标的起始点
+        mArcRightLocation = progress_left_top_bottom_margin + arc_radius;
+        
 	}
 	
 	/**
 	 * 绘制进度条和叶子
 	 * @param leafs2  叶子集合
 	 */
-	private void drawProgressAndLeafs(Canvas  canvas, List<Leaf> leafs2) {
+	private void drawProgressAndLeafs(Canvas  canvas) {
 		
-		//1.重置进度条总进度
-		if(mProgress == TOTAL_PROGRESS) mProgress = 0;
-		
-		//2.计算当前进度条进度位置
-		// 2-1：把进度条的实际宽度按进度条的总进度100，进行平均分配，分成100份.获得每一份的进度位置
-		// 2-2:根据当前进度条进度 * 每一份的进度条位置，就可以得到当前进度条所在位置
-		current_progress_position = current_progress_width / TOTAL_PROGRESS  * mProgress;
-		
-		//3.绘制进度条和叶子
-		
-		if(current_progress_position < arc_radius){//当前进度条位置  < 弧度半径
-			//1.绘制白色区域的弧度
-				canvas.drawArc(arc_rectf, 90f, 180f, false, whitePaint);
-			//2.绘制白色区域的矩形
-				//矩形区域left坐标 = left_margin + 弧度半径   (其实就是去除弧度部分)
-				progress_white_rectf.left = progress_left_top_bottom_margin + arc_radius;
-				canvas.drawRect(progress_white_rectf, whitePaint);
-			//3.绘制叶子
-				drawLeafs(canvas);
-			//4.绘制橘色区域的弧度
-				//角度 θ，以弧度为单位，满足 0 ≤θ≤π
-				double valuebyarc = Math.acos((arc_radius - current_progress_position) / arc_radius);
-				//以弧度为单位测得的角度大致相等的角度，以度衡量
-				int angrad = (int) Math.toDegrees(valuebyarc);
-				 // 起始的位置
-	            int startAngle = 180 - angrad;
+		 if (mProgress >= TOTAL_PROGRESS) {
+	            mProgress = 0;
+	        }
+	        // mProgressWidth为进度条的宽度，根据当前进度算出进度条的位置
+	        //mProgressWidth 在onSizeChanage()方法进行初始化
+	        current_progress_position = progress_width * mProgress / TOTAL_PROGRESS;
+	        // 即当前位置在图中所示1范围内
+	        //当前进度条的位置小于弧形半径
+	        if (current_progress_position < arc_radius) {
+	            // 1.绘制白色ARC，绘制orange ARC
+	            // 2.绘制白色矩形
+
+	            // 1.绘制白色ARC
+	            canvas.drawArc(
+	                    arc_rectf,//RectF
+	                    90,//startAngle //起始角度
+	                    180,//sweepAngle //顺时针扫过的角度 (圆心角角度，360为圆，180为半圆)
+	                    false,//useCenter
+	                    whitePaint //Paint
+	            );
+
+	            // 2.绘制白色矩形
+	            progress_white_rectf.left = mArcRightLocation;
+	            canvas.drawRect(progress_white_rectf, whitePaint);
+
+	            // 绘制叶子
+	            drawLeafs(canvas);
+
+	            // 3.绘制棕色 ARC
+	            // 单边角度
+	            //Math.acos(double d)返回余弦值为指定数字的角度
+	            //Matn.toDegress(double d) 转换以弧度为单位测得的角度大致相等的角度，以度衡量.  弧度转换为角度
+	            int angle = (int) Math.toDegrees(Math.acos((arc_radius - current_progress_position) / (float) arc_radius));
+	            // 起始的位置
+	            int startAngle = 180 - angle;
 	            // 扫过的角度
-	            int sweepAngle = 2 * angrad;
-	            
-				canvas.drawArc(progress_orange_rectf, startAngle, sweepAngle, false, orangePaint);
-		}else{
-			//1.绘制白色区域的矩形
-			progress_white_rectf.left = progress_left_top_bottom_margin + arc_radius;
-			canvas.drawRect(progress_white_rectf, whitePaint);
-			//2.绘制叶子
-			drawLeafs(canvas);
-			//3.绘制橘色区域的弧度
-			canvas.drawArc(arc_rectf, 90, 180, false, whitePaint);
-			//4.绘制橘色区域的矩形
-			progress_orange_rectf.left = progress_left_top_bottom_margin + arc_radius;//去除弧度部分
-			progress_orange_rectf.right = current_progress_position;//当前进度条的进度位置
-			canvas.drawRect(progress_orange_rectf, orangePaint);
-		}
-		
-		
-		
-	}
+	            int sweepAngle = 2 * angle;
+	            canvas.drawArc(arc_rectf, startAngle, sweepAngle, false, orangePaint);
+	        } else {
 
-	/**
-	 * 绘制叶子
-	 * @param canvas
-	 */
-	private void drawLeafs(Canvas canvas) {
-		// TODO Auto-generated method stub
-		//初始叶子旋转一周所需时间
-		if(factory.getLeaf_rotate_cycle_time() <= 0){
-			factory.setLeaf_rotate_cycle_time(factory.DEFAULT_LEAF_ROTATE_CYCLE_TIME);
-		}
-		//初始叶子飘动一周所需时间
-		if(factory.getLeaf_float_cycle_time() <= 0){
-			factory.setLeaf_float_cycle_time(factory.DEFAULT_LEAF_FLOAT_CYCLE_TIME);
-		}
-		
-		long currentTime = System.currentTimeMillis();
-		
-		Leaf leaf;
-		for(int i = 0 ; i < leafs.size(); i++){
-			leaf = leafs.get(i);
-			if(currentTime > leaf.getStartTime() && leaf.getStartTime() != 0){
-				//1.根据叶子的类型和当前时间得出叶子的（x，y）
-				getLeafLocation(leaf, currentTime);
-                canvas.save();//注意这里
-                
-                //2.控制叶子的移动和旋转
-                Matrix matrix = new Matrix();
-                
-					float transX = progress_left_top_bottom_margin + leaf.getX();
-					float transY = progress_left_top_bottom_margin + leaf.getY();
-					//控制叶子进行移动
-					matrix.postTranslate(transX, transX);
-                
-                //控制叶子进行旋转
-	                // 通过时间关联旋转角度，则可以直接通过修改LEAF_ROTATE_TIME调节叶子旋转快慢
-	                float rotateFraction = ((currentTime - leaf.getStartTime()) % factory.getLeaf_rotate_cycle_time()) / (float) factory.getLeaf_rotate_cycle_time();
-	                int angle = (int) (rotateFraction * 360);
-	                // 根据叶子旋转方向确定叶子旋转角度
-	                int rotate = leaf.getRotateDirection() == 0 ? angle + leaf.getRotateAngle() : -angle + leaf.getRotateAngle();
-	                
-	                matrix.postRotate(
-	                        rotate,
-	                        transX + leaf_out_width / 2,
-	                        transY + leaf_out_height / 2
-	
-	                );
-	                
-                canvas.drawBitmap(leaf_bitmap, matrix, bitmapPaint);
-                canvas.restore();
-                
-			}else{
-				continue;
-			}
-		}
-		
-		
-	}
+	            // 1.绘制white RECT
+	            // 2.绘制Orange ARC
+	            // 3.绘制orange RECT
+	            // 这个层级进行绘制能让叶子感觉是融入棕色进度条中
+	            // 1.绘制white RECT
+	        	progress_white_rectf.left = current_progress_position;
+	            canvas.drawRect(progress_white_rectf, whitePaint);
+	            // 绘制叶子
+	            drawLeafs(canvas);
+	            // 2.绘制Orange ARC
+	            canvas.drawArc(arc_rectf, 90, 180, false, orangePaint);
+	            // 3.绘制orange RECT
+	            progress_orange_rectf.left = mArcRightLocation;
+	            progress_orange_rectf.right = current_progress_position;
+	            canvas.drawRect(progress_orange_rectf, orangePaint);
 
-	private void getLeafLocation(Leaf leaf, long currentTime) {
-		 long intervalTime = currentTime - leaf.getStartTime();// 假如相差3秒
-	        if (intervalTime < 0) {
-	            return;
-	        } else if (intervalTime > factory.getLeaf_float_cycle_time()) {//大于2秒
-	            leaf.setStartTime(System.currentTimeMillis() + new Random().nextInt((int) factory.getLeaf_float_cycle_time()));
 	        }
 
-	        float fraction = (float) intervalTime / factory.getLeaf_float_cycle_time();
-	        leaf.setX((int) (current_progress_width - current_progress_width * fraction));
-	        leaf.setY(getLocationY(leaf));
+		
+		
 	}
 
+    /**
+     * 绘制叶子
+     * 
+     * @param canvas
+     */
+    private void drawLeafs(Canvas canvas) {
+    	//初始叶子旋转一周所需时间
+        mLeafRotateTime = mLeafRotateTime <= 0 ? LEAF_ROTATE_TIME : mLeafRotateTime;
+
+        long currentTime = System.currentTimeMillis();
+
+        //遍历随机生成的叶子
+        for (int i = 0; i < leafs.size(); i++) {
+            Leaf leaf = leafs.get(i);
+            if (currentTime > leaf.startTime && leaf.startTime != 0) {
+                // 绘制叶子－－根据叶子的类型和当前时间得出叶子的（x，y）
+                getLeafLocation(leaf, currentTime);
+                // 根据时间计算旋转角度
+                canvas.save();
+                // 通过Matrix控制叶子旋转
+                Matrix matrix = new Matrix();
+                float transX = progress_left_top_bottom_margin + leaf.x;
+                float transY = progress_left_top_bottom_margin + leaf.y;
+
+                //进行叶子移动
+                matrix.postTranslate(transX, transY);
+
+                // 通过时间关联旋转角度，则可以直接通过修改LEAF_ROTATE_TIME调节叶子旋转快慢
+                float rotateFraction = ((currentTime - leaf.startTime) % mLeafRotateTime) / (float) mLeafRotateTime;
+
+                int angle = (int) (rotateFraction * 360);
+
+                // 根据叶子旋转方向确定叶子旋转角度
+                int rotate = leaf.rotateDirection == 0 ? angle + leaf.rotateAngle : -angle + leaf.rotateAngle;
+
+                //进行叶子旋转
+                matrix.postRotate(
+                        rotate,
+                        transX + leaf_out_width / 2,
+                        transY + leaf_out_height/ 2
+
+                );
+
+                canvas.drawBitmap(leaf_bitmap, matrix, bitmapPaint);
+
+                canvas.restore();
+
+            } else {
+                continue;
+            }
+        }
+    }
+    
+    private void getLeafLocation(Leaf leaf, long currentTime) {
+        long intervalTime = currentTime - leaf.startTime;// 假如相差3秒
+        mLeafFloatTime = mLeafFloatTime <= 0 ? LEAF_FLOAT_TIME : mLeafFloatTime;
+        if (intervalTime < 0) {
+            return;
+        } else if (intervalTime > mLeafFloatTime) {//大于2秒
+            leaf.startTime = System.currentTimeMillis() + new Random().nextInt((int) mLeafFloatTime);
+        }
+
+        float fraction = (float) intervalTime / mLeafFloatTime;
+        leaf.x = (int) (progress_width - progress_width * fraction);
+        leaf.y = getLocationY(leaf);
+    }
 
     // 通过叶子信息获取当前叶子的Y值
     private int getLocationY(Leaf leaf) {
         // y = A(wx+Q)+h
         //首先根据效果情况基本确定出 曲线函数，标准函数方程为：y = A(wx+Q)+h，其中w影响周期，A影响振幅 ，周期T＝ 2 * Math.PI/w;
        // 根据效果可以看出，周期大致为总进度长度，所以确定w＝(float) ((float) 2 * Math.PI /mProgressWidth)；
-
-        // 中等振幅大小
-         int mMiddleAmplitude = 13;
-        // 振幅差
-         int mAmplitudeDisparity = 5;
-        
-        float w = (float) ((float) 2 * Math.PI / current_progress_width);
+        float w = (float) ((float) 2 * Math.PI / progress_width);
         float a = mMiddleAmplitude;
-        switch (leaf.getType()) {
-            case SMALL:
+        switch (leaf.type) {
+            case LITTLE:
                 // 小振幅 ＝ 中等振幅 － 振幅差
                 a = mMiddleAmplitude - mAmplitudeDisparity;
                 break;
@@ -433,8 +466,80 @@ public class LoadingView extends View{
             default:
                 break;
         }
-        return (int) (a * Math.sin(w * leaf.getX())) + arc_radius * 2 / 3;
+        return (int) (a * Math.sin(w * leaf.x)) + arc_radius * 2 / 3;
     }
+
+    
+    private enum StartType {
+        LITTLE, MIDDLE, BIG
+    }
+    
+    private class Leaf {
+
+        // 在绘制部分的位置
+        float x, y;
+        // 控制叶子飘动的幅度
+        StartType type;
+        // 旋转角度
+        int rotateAngle;
+        // 旋转方向--0代表顺时针，1代表逆时针
+        int rotateDirection;
+        // 起始时间(ms)
+        long startTime;
+    }
+    /**
+     * 叶子工厂，用于生成叶子对象
+     */
+    private class LeafFactory {
+        private static final int MAX_LEAFS = 8;
+        Random random = new Random();
+
+        // 生成一个叶子信息
+        public Leaf generateLeaf() {
+            Leaf leaf = new Leaf();
+            int randomType = random.nextInt(3);
+            // 随时类型－ 叶子飘浮的随机振幅
+            StartType type = StartType.MIDDLE;
+            switch (randomType) {
+                case 0:
+                    break;
+                case 1:
+                    type = StartType.LITTLE;
+                    break;
+                case 2:
+                    type = StartType.BIG;
+                    break;
+                default:
+                    break;
+            }
+            leaf.type = type;
+            // 随机起始的旋转角度
+            leaf.rotateAngle = random.nextInt(360);
+            // 随机旋转方向（顺时针或逆时针）
+            leaf.rotateDirection = random.nextInt(2);
+            // 为了产生交错的感觉，让开始的时间有一定的随机性
+            mLeafFloatTime = mLeafFloatTime <= 0 ? LEAF_FLOAT_TIME : mLeafFloatTime;
+            mAddTime += random.nextInt((int) (mLeafFloatTime * 2));
+            leaf.startTime = System.currentTimeMillis() + mAddTime;
+            return leaf;
+        }
+        
+     // 根据最大叶子数产生叶子信息
+        public List<Leaf> generateLeafs() {
+            return generateLeafs(MAX_LEAFS);
+        }
+
+        // 根据传入的叶子数量产生叶子信息
+        public List<Leaf> generateLeafs(int leafSize) {
+            List<Leaf> leafs = new LinkedList<Leaf>();
+            for (int i = 0; i < leafSize; i++) {
+                leafs.add(generateLeaf());
+            }
+            return leafs;
+        }
+        
+    }
+
 	
 	
     /**
