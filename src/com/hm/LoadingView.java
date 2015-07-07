@@ -123,7 +123,7 @@ public class LoadingView extends View{
 	 */
 	int current_progress_position = 0;
 	/**
-	 * 当前进度条的宽度
+	 * 进度条的宽度
 	 */
 	int progress_width;
 	/**
@@ -389,26 +389,25 @@ public class LoadingView extends View{
         for (int i = 0; i < leafs.size(); i++) {
             Leaf leaf = leafs.get(i);
             if (currentTime > leaf.startTime && leaf.startTime != 0) {
-                // 绘制叶子－－根据叶子的类型和当前时间得出叶子的（x，y）
+                //绘制叶子－－根据叶子的类型和当前时间得出叶子的（x，y）
                 getLeafLocation(leaf, currentTime);
-                // 根据时间计算旋转角度
+                
                 canvas.save();
-                // 通过Matrix控制叶子旋转
+                
+                //通过Matrix控制叶子移动和旋转
                 Matrix matrix = new Matrix();
                 float transX = progress_left_top_bottom_margin + leaf.x;
                 float transY = progress_left_top_bottom_margin + leaf.y;
-
                 //进行叶子移动
                 matrix.postTranslate(transX, transY);
-
+                
+                //控制叶子旋转
                 // 通过时间关联旋转角度，则可以直接通过修改LEAF_ROTATE_TIME调节叶子旋转快慢
+                // 
                 float rotateFraction = ((currentTime - leaf.startTime) % mLeafRotateTime) / (float) mLeafRotateTime;
-
                 int angle = (int) (rotateFraction * 360);
-
                 // 根据叶子旋转方向确定叶子旋转角度
                 int rotate = leaf.rotateDirection == 0 ? angle + leaf.rotateAngle : -angle + leaf.rotateAngle;
-
                 //进行叶子旋转
                 matrix.postRotate(
                         rotate,
@@ -428,14 +427,18 @@ public class LoadingView extends View{
     }
     
     private void getLeafLocation(Leaf leaf, long currentTime) {
-        long intervalTime = currentTime - leaf.startTime;// 假如相差3秒
-        mLeafFloatTime = mLeafFloatTime <= 0 ? LEAF_FLOAT_TIME : mLeafFloatTime;
-        if (intervalTime < 0) {
+        long intervalTime = currentTime - leaf.startTime;// 相差秒
+        if (intervalTime < 0) {//则还没有出现进度条中
             return;
-        } else if (intervalTime > mLeafFloatTime) {//大于2秒
+        } else if (intervalTime > mLeafFloatTime) {//大于飘动一周的时间，重新计算当前叶子的开始的时间。当前时间 + 飘动的一个周期
             leaf.startTime = System.currentTimeMillis() + new Random().nextInt((int) mLeafFloatTime);
         }
 
+        //计算叶子在进度条中所在的位置
+        //1.计算当前叶子在一个周期内飘动过的时间比率：  T = (当前时间 - 叶子开始时间 ) / 叶子飘动的一周的时间
+        //2.计算在进度条上飘过的距离 W = 进度条的宽度  * T(叶子一周期内飘过的时间比率)
+        //3.计算叶子在X轴飘过的坐标：X = 进度条的宽度 - W(叶子在进度条飘过的距离)
+        //4.计算叶子在Y轴飘过的坐标：y=Asin（ωx+φ）+h
         float fraction = (float) intervalTime / mLeafFloatTime;
         leaf.x = (int) (progress_width - progress_width * fraction);
         leaf.y = getLocationY(leaf);
@@ -443,9 +446,13 @@ public class LoadingView extends View{
 
     // 通过叶子信息获取当前叶子的Y值
     private int getLocationY(Leaf leaf) {
-        // y = A(wx+Q)+h
-        //首先根据效果情况基本确定出 曲线函数，标准函数方程为：y = A(wx+Q)+h，其中w影响周期，A影响振幅 ，周期T＝ 2 * Math.PI/w;
-       // 根据效果可以看出，周期大致为总进度长度，所以确定w＝(float) ((float) 2 * Math.PI /mProgressWidth)；
+        //y=Asin（ωx+φ）+h
+    	//各常数值对函数图像的影响：
+    	//A：决定峰值（即纵向拉伸压缩的倍数）- 振幅
+    	//φ（初相位）：决定波形与X轴位置关系或横向移动距离
+    	//ω：决定周期（最小正周期T=2π/|ω|）
+    	//h：表示波形在Y轴的位置关系或纵向移动距离
+    	
         float w = (float) ((float) 2 * Math.PI / progress_width);
         float a = mMiddleAmplitude;
         switch (leaf.type) {
@@ -463,7 +470,7 @@ public class LoadingView extends View{
             default:
                 break;
         }
-        return (int) (a * Math.sin(w * leaf.x)) + arc_radius * 2 / 3;
+        return (int) (a * Math.sin(w * leaf.x)) +  arc_radius * 2 / 3;
     }
 
     
