@@ -3,12 +3,14 @@ package com.hm;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
+
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Rect;
@@ -154,6 +156,7 @@ public class LoadingView extends View{
 	List<Leaf> leafs;
 	LeafFactory  factory;
 	
+	
 	 // 用于控制随机增加的时间不抱团
     private int mAddTime;
 	
@@ -185,11 +188,11 @@ public class LoadingView extends View{
 		bitmapPaint.setAntiAlias(true);//抗锯齿
 		
 		whitePaint = new Paint();
-		whitePaint.setAntiAlias(true);
+		whitePaint.setAntiAlias(false);
 		whitePaint.setColor(WHITE_COLOR);
 		
 		orangePaint = new Paint();
-		orangePaint.setAntiAlias(true);
+		orangePaint.setAntiAlias(false);
 		orangePaint.setColor(ORANGE_COLOR);
 	}
 
@@ -275,7 +278,7 @@ public class LoadingView extends View{
 		
 		//初始进度条白色区域矩形(包含弧度区域部分)
 		progress_white_rectf = new RectF(
-				progress_left_top_bottom_margin + current_progress_position, 
+				progress_left_top_bottom_margin + arc_radius, 
 				progress_left_top_bottom_margin, 
 				total_width - progress_right_margin, //这里不一样
 				total_height - progress_left_top_bottom_margin //这里不一样
@@ -334,7 +337,7 @@ public class LoadingView extends View{
 	            );
 
 	            // 2.绘制白色矩形
-	            progress_white_rectf.left = mArcRightLocation;
+	            progress_white_rectf.left = progress_left_top_bottom_margin + arc_radius;
 	            canvas.drawRect(progress_white_rectf, whitePaint);
 
 	            // 绘制叶子
@@ -364,7 +367,7 @@ public class LoadingView extends View{
 	            // 2.绘制Orange ARC
 	            canvas.drawArc(arc_rectf, 90, 180, false, orangePaint);
 	            // 3.绘制orange RECT
-	            progress_orange_rectf.left = mArcRightLocation;
+	            progress_orange_rectf.left = progress_left_top_bottom_margin + arc_radius;
 	            progress_orange_rectf.right = current_progress_position;
 	            canvas.drawRect(progress_orange_rectf, orangePaint);
 
@@ -402,8 +405,7 @@ public class LoadingView extends View{
                 matrix.postTranslate(transX, transY);
                 
                 //控制叶子旋转
-                // 通过时间关联旋转角度，则可以直接通过修改LEAF_ROTATE_TIME调节叶子旋转快慢
-                // 
+                //通过时间关联旋转角度
                 float rotateFraction = ((currentTime - leaf.startTime) % mLeafRotateTime) / (float) mLeafRotateTime;
                 int angle = (int) (rotateFraction * 360);
                 // 根据叶子旋转方向确定叶子旋转角度
